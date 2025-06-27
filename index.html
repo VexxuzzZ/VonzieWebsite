@@ -1,0 +1,174 @@
+<!-- File: pages/index.html --><!DOCTYPE html><html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Vonzie WhatsApp DB Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .container {
+      width: 100%;
+      max-width: 420px;
+      background: #1e1e2f;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 25px #00f0ff50;
+    }
+    h2 { text-align: center; margin-bottom: 20px; }
+    input, button {
+      padding: 12px;
+      margin: 8px 0;
+      width: 100%;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    input { background: #333; color: #fff; }
+    button {
+      background: #00f0ff;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover { background: #00d0e0; }
+    .hidden { display: none; }
+    .link, .switch-auth {
+      margin-top: 10px;
+      font-size: 14px;
+      color: cyan;
+      text-align: center;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      margin-top: 15px;
+      border-collapse: collapse;
+      background: #111;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #444;
+      text-align: left;
+    }
+    th { background: #222; }
+    input#search { margin-top: 20px; background: #222; color: #fff; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2 id="formTitle">🔐 Login Akun</h2>
+  <div id="authBox">
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="submitAuth()">Login</button>
+    <div class="switch-auth" onclick="toggleAuth()">Belum punya akun? Daftar</div>
+  </div>  <div id="panel" class="hidden">
+    <h2>📲 Tambah Nomor WhatsApp</h2>
+    <input id="nomor" placeholder="Contoh: 628xxx">
+    <button onclick="tambahNomor()">Tambah</button><div class="link" id="jsonLink"></div>
+<input id="search" placeholder="Cari nomor..." oninput="filterNomor()">
+<table>
+  <thead><tr><th>#</th><th>Nomor</th></tr></thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+  </div>
+</div><script>
+let akun = '';
+let nomorList = [];
+let mode = 'login';
+
+function toggleAuth() {
+  if (mode === 'login') {
+    mode = 'register';
+    formTitle.textContent = '🆕 Buat Akun Baru';
+    document.querySelector('button').textContent = 'Daftar';
+    document.querySelector('.switch-auth').textContent = 'Sudah punya akun? Login';
+  } else {
+    mode = 'login';
+    formTitle.textContent = '🔐 Login Akun';
+    document.querySelector('button').textContent = 'Login';
+    document.querySelector('.switch-auth').textContent = 'Belum punya akun? Daftar';
+  }
+}
+
+function submitAuth() {
+  const user = username.value.trim();
+  const pass = password.value.trim();
+  if (!user || !pass) return alert('Isi username & password');
+
+  const saved = JSON.parse(localStorage.getItem('akunDb') || '{}');
+
+  if (mode === 'register') {
+    if (saved[user]) return alert('Username sudah dipakai!');
+    saved[user] = { password: pass };
+    localStorage.setItem('akunDb', JSON.stringify(saved));
+    alert('Akun berhasil dibuat! Silakan login.');
+    toggleAuth();
+  } else {
+    if (!saved[user]) return alert('Akun tidak ditemukan!');
+    if (saved[user].password !== pass) return alert('Password salah!');
+    akun = user;
+    document.getElementById('authBox').classList.add('hidden');
+    document.getElementById('panel').classList.remove('hidden');
+    const raw = 'https://raw.githubusercontent.com/VexxuzzZ/VonzieWebsite/main/data/database.json';
+    document.getElementById('jsonLink').innerHTML = `📦 Link JSON Utama: <a href="${raw}" target="_blank">${raw}</a>`;
+    loadData();
+  }
+}
+
+async function loadData() {
+  try {
+    const res = await fetch('https://raw.githubusercontent.com/VexxuzzZ/VonzieWebsite/main/data/database.json');
+    const all = await res.json();
+    nomorList = all[akun] || [];
+  } catch {
+    nomorList = [];
+  }
+  renderTable();
+}
+
+function renderTable(filter = '') {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  nomorList.filter(n => n.includes(filter)).forEach((nomor, i) => {
+    tbody.innerHTML += `<tr><td>${i+1}</td><td>${nomor}</td></tr>`;
+  });
+}
+
+function filterNomor() {
+  const val = document.getElementById('search').value;
+  renderTable(val);
+}
+
+async function tambahNomor() {
+  const nomor = document.getElementById('nomor').value.trim();
+  if (!/^[0-9]+$/.test(nomor)) return alert('Nomor tidak valid');
+  if (nomorList.includes(nomor)) return alert('Nomor sudah ada');
+  nomorList.push(nomor);
+  renderTable();
+
+  const res = await fetch('/api/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: akun,
+      token: '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',
+      nomor: nomorList
+    })
+  });
+  const data = await res.json();
+  if (res.ok) alert('Berhasil disimpan!');
+  else alert('Gagal menyimpan: ' + (data.error || 'Unknown error'));
+}
+</script></body>
+</html>
